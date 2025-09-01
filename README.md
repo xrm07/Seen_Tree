@@ -1,4 +1,4 @@
-LM Studio Translator (MV3, minimal)
+# LM Studio Translator (MV3, minimal)
 
 LM Studio互換APIのみを叩く最小Chrome拡張。
 要件:
