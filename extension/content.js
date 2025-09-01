@@ -47,19 +47,31 @@ document.addEventListener('mouseup', () => {
   createButton(rect.right, rect.bottom);
 });
 
+const MAX_TRANSLATABLE_NODES = 200;
+
 async function translateAll() {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes = [];
-  while (nodes.length < 200 && walker.nextNode()) {
+  const SKIP_PARENTS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT']);
+  while (nodes.length < MAX_TRANSLATABLE_NODES && walker.nextNode()) {
     const node = walker.currentNode;
-    if (node.nodeValue.trim()) nodes.push(node);
-  }
-  for (const node of nodes) {
-    const res = await chrome.runtime.sendMessage({ type: 'TRANSLATE', text: node.nodeValue });
-    if (res.ok) {
-      node.nodeValue = res.text;
+    const parentName = node.parentNode && node.parentNode.nodeName;
+    if (node.nodeValue.trim() && !SKIP_PARENTS.has(parentName)) {
+      nodes.push(node);
     }
   }
+  const concurrency = 5;
+  let index = 0;
+  async function worker() {
+    while (index < nodes.length) {
+      const node = nodes[index++];
+      const res = await chrome.runtime.sendMessage({ type: 'TRANSLATE', text: node.nodeValue });
+      if (res.ok) {
+        node.nodeValue = res.text;
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
