@@ -62,7 +62,37 @@ permissions: storage, activeTab, scripting
 主要ファイル
 manifest.json（抜粋）
 
-{ "manifest_version": 3, "name": "LM Studio Translator (minimal)", "version": "0.1.0", "permissions": ["storage", "activeTab", "scripting"], "host_permissions": [ "http://127.0.0.1:1234/", "http://localhost:1234/" ], "background": { "service_worker": "sw.js", "type": "module" }, "action": { "default_title": "Translate", "default_popup": "popup.html" }, "options_page": "options.html", "content_scripts": [ { "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle" } ] }
+```json
+{
+  "manifest_version": 3,
+  "name": "LM Studio Translator (minimal)",
+  "version": "0.1.0",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:1234/",
+    "http://localhost:1234/"
+  ],
+  "background": {
+    "service_worker": "sw.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Translate",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
 
 sw.js（役割） • 受信: { type: "TRANSLATE", text } • 送信: { ok: true, text } or { ok: false, error } • fetchでLM Studioの/v1/chat/completionsへPOST
 
