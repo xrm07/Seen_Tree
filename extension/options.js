@@ -1,63 +1,66 @@
+// Get DOM elements for the options form
 const baseUrlEl = document.getElementById('baseUrl');
 const modelEl = document.getElementById('model');
 const targetEl = document.getElementById('target');
 const statusEl = document.getElementById('status');
 
+// Load saved settings from Chrome storage when page loads
 chrome.storage.sync.get(DEFAULTS, items => {
   baseUrlEl.value = items.baseUrl;
   modelEl.value = items.model;
   targetEl.value = items.target;
 });
 
+/**
+ * Save settings with comprehensive validation and user feedback
+ * Validates required fields, URL format, and provides colored status messages
+ */
 document.getElementById('save').addEventListener('click', () => {
+  // Get trimmed values from form inputs
   const baseUrl = baseUrlEl.value.trim();
   const model = modelEl.value.trim();
   const target = targetEl.value.trim();
   
-  // Basic validation
-  if (!baseUrl) {
-    statusEl.textContent = 'Base URL is required';
-    statusEl.style.color = 'red';
+  /**
+   * Display status message with color and auto-clear timeout
+   * @param {string} message - Message to display
+   * @param {string} color - CSS color for the message
+   * @param {number} timeout - Milliseconds before clearing message
+   */
+  function showStatus(message, color, timeout = 3000) {
+    statusEl.textContent = message;
+    statusEl.style.color = color;
     setTimeout(() => {
       statusEl.textContent = '';
       statusEl.style.color = '';
-    }, 3000);
+    }, timeout);
+  }
+  
+  // Validate required fields
+  if (!baseUrl) {
+    showStatus('Base URL is required', 'red');
     return;
   }
   
   if (!target) {
-    statusEl.textContent = 'Target language is required';
-    statusEl.style.color = 'red';
-    setTimeout(() => {
-      statusEl.textContent = '';
-      statusEl.style.color = '';
-    }, 3000);
+    showStatus('Target language is required', 'red');
     return;
   }
   
-  // Validate URL format
+  // Validate URL format using built-in URL constructor
   try {
     new URL(baseUrl);
   } catch {
-    statusEl.textContent = 'Invalid Base URL format';
-    statusEl.style.color = 'red';
-    setTimeout(() => {
-      statusEl.textContent = '';
-      statusEl.style.color = '';
-    }, 3000);
+    showStatus('Invalid Base URL format', 'red');
     return;
   }
   
+  // Save validated settings to Chrome storage
   chrome.storage.sync.set({
     baseUrl: baseUrl,
     model: model,
     target: target
   }, () => {
-    statusEl.textContent = 'Saved';
-    statusEl.style.color = 'green';
-    setTimeout(() => {
-      statusEl.textContent = '';
-      statusEl.style.color = '';
-    }, 1000);
+    showStatus('Saved', 'green', 1000);
   });
 });
