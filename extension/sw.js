@@ -8,6 +8,16 @@ async function getSettings() {
 
 async function translate(text) {
   const { baseUrl, model, target } = await getSettings();
+  
+  // Validate settings
+  if (!baseUrl || !target) {
+    throw new Error('Base URL and target language must be configured in extension options');
+  }
+  
+  if (!text || !text.trim()) {
+    return text; // Return original text if empty
+  }
+  
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -23,11 +33,11 @@ async function translate(text) {
   if (!res.ok) {
     const responseBody = await res.text();
     throw new Error(
-      `Translation failed (HTTP ${res.status} ${res.statusText}). Original text: "${text}". Response: ${responseBody}`
+      `Translation failed (HTTP ${res.status} ${res.statusText}). Original text: "${text.substring(0, 50)}...". Response: ${responseBody}`
     );
   }
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || '';
+  return data.choices?.[0]?.message?.content || text; // Return original text if no translation
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

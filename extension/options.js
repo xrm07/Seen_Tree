@@ -10,12 +10,54 @@ chrome.storage.sync.get(DEFAULTS, items => {
 });
 
 document.getElementById('save').addEventListener('click', () => {
+  const baseUrl = baseUrlEl.value.trim();
+  const model = modelEl.value.trim();
+  const target = targetEl.value.trim();
+  
+  // Basic validation
+  if (!baseUrl) {
+    statusEl.textContent = 'Base URL is required';
+    statusEl.style.color = 'red';
+    setTimeout(() => {
+      statusEl.textContent = '';
+      statusEl.style.color = '';
+    }, 3000);
+    return;
+  }
+  
+  if (!target) {
+    statusEl.textContent = 'Target language is required';
+    statusEl.style.color = 'red';
+    setTimeout(() => {
+      statusEl.textContent = '';
+      statusEl.style.color = '';
+    }, 3000);
+    return;
+  }
+  
+  // Validate URL format
+  try {
+    new URL(baseUrl);
+  } catch {
+    statusEl.textContent = 'Invalid Base URL format';
+    statusEl.style.color = 'red';
+    setTimeout(() => {
+      statusEl.textContent = '';
+      statusEl.style.color = '';
+    }, 3000);
+    return;
+  }
+  
   chrome.storage.sync.set({
-    baseUrl: baseUrlEl.value,
-    model: modelEl.value,
-    target: targetEl.value
+    baseUrl: baseUrl,
+    model: model,
+    target: target
   }, () => {
     statusEl.textContent = 'Saved';
-    setTimeout(() => (statusEl.textContent = ''), 1000);
+    statusEl.style.color = 'green';
+    setTimeout(() => {
+      statusEl.textContent = '';
+      statusEl.style.color = '';
+    }, 1000);
   });
 });

@@ -60,22 +60,50 @@ async function translateAll() {
       nodes.push(node);
     }
   }
+  
+  if (nodes.length === 0) {
+    console.log('No translatable text nodes found');
+    return;
+  }
+  
+  console.log(`Starting translation of ${nodes.length} text nodes`);
+  
   const concurrency = 5;
   let index = 0;
+  let successful = 0;
+  let failed = 0;
+  
   async function worker() {
     while (index < nodes.length) {
       const node = nodes[index++];
-      const res = await chrome.runtime.sendMessage({ type: 'TRANSLATE', text: node.nodeValue });
-      if (res.ok) {
-        node.nodeValue = res.text;
+      try {
+        const res = await chrome.runtime.sendMessage({ type: 'TRANSLATE', text: node.nodeValue });
+        if (res.ok) {
+          node.nodeValue = res.text;
+          successful++;
+        } else {
+          console.warn('Translation failed for node:', node.nodeValue.substring(0, 50), res.error);
+          failed++;
+        }
+      } catch (error) {
+        console.error('Error translating node:', error);
+        failed++;
       }
     }
   }
+  
   await Promise.all(Array.from({ length: concurrency }, worker));
+  console.log(`Translation completed. Successful: ${successful}, Failed: ${failed}`);
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'START_PAGE_TRANSLATION') {
-    translateAll();
+    translateAll().then(() => {
+      sendResponse({ success: true });
+    }).catch(error => {
+      console.error('Translation failed:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep the message channel open for async response
   }
 });
