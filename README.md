@@ -8,7 +8,6 @@ LM StudioのAPI設定で作動
 右上の拡張ポップから「全文翻訳」開始。終了後ページ上テキストを置換
 1. 構成
 
-/extension ├─ manifest.json # MV3宣言。SW・権限・コンテントスクリプト・ポップ ├─ sw.js # Service Worker。LM Studioへfetch、翻訳実行 ├─ content.js # 選択検知→フローティングボタン→結果ポップ、全文置換ロジック ├─ popup.html / popup.js # 右上ポップ。全文翻訳の開始ボタン ├─ options.html / options.js # LM Studio Base URL / Model / Target言語設定（storage.sync） └─ README.md
 
 データフロー
 
