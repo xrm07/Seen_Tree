@@ -1,17 +1,41 @@
 (() => {
   let hoverButton = null;
   let resultPopup = null;
+  let settings = {
+    direction: "enja",
+    autoTranslate: false,
+    showSourceOnHover: false,
+    showSelectionButton: true
+  };
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "sync") return;
+    for (const [k, v] of Object.entries(changes)) {
+      settings[k] = v.newValue;
+    }
+  });
+
+  (async () => {
+    const s = await chrome.storage.sync.get(settings);
+    settings = Object.assign(settings, s);
+    if (settings.autoTranslate) {
+      startPageTranslation();
+    }
+  })();
 
   document.addEventListener("mouseup", () => {
     const sel = window.getSelection();
     const text = sel && sel.toString().trim();
     if (!text) { hideUI(); return; }
     const rect = sel.getRangeAt(0).getBoundingClientRect();
-    showButtonNear(rect, text);
+    if (settings.showSelectionButton) {
+      showButtonNear(rect, text);
+    }
   });
 
   chrome.runtime.onMessage.addListener(async (msg) => {
     if (msg?.type === "START_PAGE_TRANSLATION") {
+      if (msg.direction) settings.direction = msg.direction;
       await translateWholePage();
     }
   });
@@ -71,10 +95,24 @@
     }
     for (const n of nodes) {
       try {
-        const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text: n.nodeValue });
-        if (res?.ok) n.nodeValue = res.text;
+        const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text: n.nodeValue, direction: settings.direction });
+        if (res?.ok) {
+          if (settings.showSourceOnHover) {
+            const original = n.nodeValue;
+            const span = document.createElement("span");
+            span.textContent = res.text;
+            span.title = original;
+            n.parentNode.replaceChild(span, n);
+          } else {
+            n.nodeValue = res.text;
+          }
+        }
       } catch {}
       await new Promise(r => setTimeout(r, 50));
     }
+  }
+
+  function startPageTranslation() {
+    translateWholePage();
   }
 })();

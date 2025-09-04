@@ -3,7 +3,7 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
   if (msg?.type === "TRANSLATE") {
     try {
       const { text } = msg;
-      const { baseUrl, model, target } = await loadSettings();
+      const { baseUrl, model, target, direction } = await loadSettingsWithDirection(msg.direction);
       const translated = await translateWithLMStudio({ baseUrl, model, target, text });
       sendResponse({ ok: true, text: translated });
     } catch (err) {
@@ -13,13 +13,16 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
   }
 });
 
-async function loadSettings() {
-  const { baseUrl, model, target } = await chrome.storage.sync.get({
+async function loadSettingsWithDirection(overrideDirection) {
+  const data = await chrome.storage.sync.get({
     baseUrl: "http://127.0.0.1:1234/v1",
     model: "qwen2.5-7b-instruct",
-    target: "ja"
+    target: "ja",
+    direction: "enja"
   });
-  return { baseUrl, model, target };
+  const direction = overrideDirection || data.direction || "enja";
+  const target = direction === "jaen" ? "en" : "ja";
+  return { baseUrl: data.baseUrl, model: data.model, target, direction };
 }
 
 async function translateWithLMStudio({ baseUrl, model, target, text }) {
