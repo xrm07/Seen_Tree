@@ -13,6 +13,20 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
   }
 });
 
+// Context menu to start page translation
+chrome.runtime.onInstalled.addListener(() => {
+  try {
+    chrome.contextMenus.create({ id: "lmstudio-translate-page", title: "このページを翻訳", contexts: ["page"] });
+  } catch {}
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === "lmstudio-translate-page" && tab?.id) {
+    const { direction } = await chrome.storage.sync.get({ direction: "enja" });
+    chrome.tabs.sendMessage(tab.id, { type: "START_PAGE_TRANSLATION", direction });
+  }
+});
+
 async function loadSettingsWithDirection(overrideDirection) {
   const data = await chrome.storage.sync.get({
     baseUrl: "http://127.0.0.1:1234/v1",
