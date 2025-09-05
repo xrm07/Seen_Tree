@@ -1,81 +1,152 @@
-function createButton(x, y) {
-  let btn = document.getElementById('lmst-translate-btn');
-  if (!btn) {
-    btn = document.createElement('button');
-    btn.id = 'lmst-translate-btn';
-    btn.textContent = '\u7ffb\u8a33';
-    btn.style.position = 'absolute';
-    btn.style.zIndex = 2147483647;
-    document.body.appendChild(btn);
-    btn.addEventListener('click', async () => {
-      const text = window.getSelection().toString();
-      removeButton();
-      const res = await chrome.runtime.sendMessage({ type: 'TRANSLATE', text });
-      showPopup(x, y, res.ok ? res.text : `Error: ${res.error}`);
-    });
+(() => {
+  let hoverButton = null;
+  let resultPopup = null;
+  let settings = {
+    direction: "enja",
+    autoTranslate: false,
+    showSourceOnHover: false,
+    showSelectionButton: true
+  };
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "sync") return;
+    for (const [k, v] of Object.entries(changes)) {
+      settings[k] = v.newValue;
+    }
+  });
+
+  (async () => {
+    const s = await chrome.storage.sync.get(settings);
+    settings = Object.assign(settings, s);
+    if (settings.autoTranslate) {
+      showProgress();
+      try { await translateWholePage(); } finally { hideProgress(); }
+    }
+  })();
+
+  document.addEventListener("mouseup", () => {
+    const sel = window.getSelection();
+    const text = sel && sel.toString().trim();
+    if (!text) { hideUI(); return; }
+    if (!sel || sel.rangeCount === 0) { hideUI(); return; }
+    let rect;
+    try { rect = sel.getRangeAt(0).getBoundingClientRect(); } catch (_) { hideUI(); return; }
+    if (settings.showSelectionButton) {
+      showButtonNear(rect, text);
+    }
+  });
+
+  chrome.runtime.onMessage.addListener(async (msg) => {
+    if (msg?.type === "START_PAGE_TRANSLATION") {
+      if (msg.direction) settings.direction = msg.direction;
+      await translateWholePage();
+    }
+  });
+
+  function showButtonNear(rect, text) {
+    if (!hoverButton) {
+      hoverButton = document.createElement("button");
+      hoverButton.textContent = "翻訳";
+      hoverButton.style.position = "fixed";
+      hoverButton.style.zIndex = 2147483647;
+      document.body.appendChild(hoverButton);
+    }
+    // 毎回最新の選択内容でハンドラを更新
+    hoverButton.onclick = () => translateSelected(text, rect);
+    hoverButton.style.top = `${rect.bottom + 6}px`;
+    hoverButton.style.left = `${rect.right + 6}px`;
+    hoverButton.style.display = "block";
   }
-  btn.style.left = `${window.scrollX + x}px`;
-  btn.style.top = `${window.scrollY + y}px`;
-}
 
-function removeButton() {
-  const btn = document.getElementById('lmst-translate-btn');
-  if (btn) btn.remove();
-}
-
-function showPopup(x, y, text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  div.style.position = 'absolute';
-  div.style.background = 'white';
-  div.style.border = '1px solid #ccc';
-  div.style.padding = '4px';
-  div.style.zIndex = 2147483647;
-  div.style.left = `${window.scrollX + x}px`;
-  div.style.top = `${window.scrollY + y + 20}px`;
-  document.body.appendChild(div);
-  setTimeout(() => div.remove(), 5000);
-}
-
-document.addEventListener('mouseup', () => {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed) {
-    removeButton();
-    return;
+  function hideUI() {
+    if (hoverButton) hoverButton.style.display = "none";
+    if (resultPopup) resultPopup.remove(), resultPopup = null;
   }
-  const rect = sel.getRangeAt(0).getBoundingClientRect();
-  createButton(rect.right, rect.bottom);
-});
 
-const MAX_TRANSLATABLE_NODES = 200;
-
-async function translateAll() {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  const nodes = [];
-  const SKIP_PARENTS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT']);
-  while (nodes.length < MAX_TRANSLATABLE_NODES && walker.nextNode()) {
-    const node = walker.currentNode;
-    const parentName = node.parentNode && node.parentNode.nodeName;
-    if (node.nodeValue.trim() && !SKIP_PARENTS.has(parentName)) {
-      nodes.push(node);
+  async function translateSelected(text, rect) {
+    try {
+      const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text, direction: settings.direction });
+      if (!res?.ok) throw new Error(res?.error || "Unknown error");
+      showPopup(rect, res.text);
+    } catch (err) {
+      console.error(err);
     }
   }
-  const concurrency = 5;
-  let index = 0;
-  async function worker() {
-    while (index < nodes.length) {
-      const node = nodes[index++];
-      const res = await chrome.runtime.sendMessage({ type: 'TRANSLATE', text: node.nodeValue });
-      if (res.ok) {
-        node.nodeValue = res.text;
-      }
+
+  function showPopup(rect, content) {
+    if (!resultPopup) {
+      resultPopup = document.createElement("div");
+      resultPopup.style.position = "fixed";
+      resultPopup.style.maxWidth = "360px";
+      resultPopup.style.padding = "8px 10px";
+      resultPopup.style.background = "#111";
+      resultPopup.style.color = "#fff";
+      resultPopup.style.borderRadius = "6px";
+      resultPopup.style.zIndex = 2147483647;
+      resultPopup.style.boxShadow = "0 2px 10px rgba(0,0,0,.2)";
+      resultPopup.addEventListener("click", () => resultPopup?.remove());
+      document.body.appendChild(resultPopup);
+    }
+    resultPopup.textContent = content;
+    resultPopup.style.top = `${rect.bottom + 6}px`;
+    resultPopup.style.left = `${Math.min(rect.left, window.innerWidth - 380)}px`;
+  }
+
+  let cancelRequested = false;
+  function showProgress() {
+    let overlay = document.getElementById("lmst-progress");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "lmst-progress";
+      overlay.style.cssText = "position:fixed;inset:auto 16px 16px auto;background:#111;color:#fff;padding:10px 12px;border-radius:8px;z-index:2147483647;box-shadow:0 2px 10px rgba(0,0,0,.2);font:13px/1.2 system-ui,sans-serif";
+      const text = document.createElement("div");
+      text.id = "lmst-progress-text";
+      text.textContent = "翻訳中...";
+      const btn = document.createElement("button");
+      btn.textContent = "キャンセル";
+      btn.style.cssText = "margin-top:8px;background:#ef4444;color:#fff;border:0;padding:6px 8px;border-radius:6px;cursor:pointer;width:100%";
+      btn.addEventListener("click", () => { cancelRequested = true; hideProgress(); });
+      overlay.appendChild(text); overlay.appendChild(btn); document.body.appendChild(overlay);
     }
   }
-  await Promise.all(Array.from({ length: concurrency }, worker));
-}
-
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'START_PAGE_TRANSLATION') {
-    translateAll();
+  function updateProgress(done, total) {
+    const t = document.getElementById("lmst-progress-text");
+    if (t) t.textContent = `翻訳中... ${done}/${total}`;
   }
-});
+  function hideProgress() { const o = document.getElementById("lmst-progress"); if (o) o.remove(); }
+
+  async function translateWholePage() {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (nodes.length < 500 && walker.nextNode()) {
+      const n = walker.currentNode;
+      if (!n.nodeValue || !n.nodeValue.trim()) continue;
+      if (/^(SCRIPT|STYLE|NOSCRIPT|IFRAME|CANVAS|SVG)$/i.test(n.parentElement?.tagName || "")) continue;
+      nodes.push(n);
+    }
+    let done = 0;
+    for (const n of nodes) {
+      if (cancelRequested) break;
+      try {
+        const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text: n.nodeValue, direction: settings.direction });
+        if (res?.ok) {
+          if (settings.showSourceOnHover) {
+            const original = n.nodeValue;
+            const span = document.createElement("span");
+            span.textContent = res.text;
+            span.title = original;
+            n.parentNode.replaceChild(span, n);
+          } else {
+            n.nodeValue = res.text;
+          }
+        }
+      } catch {}
+      await new Promise(r => setTimeout(r, 50));
+      done += 1; updateProgress(done, nodes.length);
+    }
+  }
+
+  function startPageTranslation() {
+    cancelRequested = false; showProgress(); translateWholePage().finally(hideProgress);
+  }
+})();

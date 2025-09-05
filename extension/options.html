@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-</head>
-<body>
-  <label>Base URL: <input id="baseUrl"></label><br>
-  <label>Model: <input id="model"></label><br>
-  <label>Target Lang: <input id="target"></label><br>
-  <button id="save">Save</button>
-  <div id="status"></div>
-  <script src="constants.js"></script>
-  <script src="options.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Options - LM Studio Translator</title>
+    <style> body { width: 360px; padding: 12px; font-family: system-ui, sans-serif; } label { display:block; margin: 8px 0 4px; } input { width:100%; padding:6px 8px; } </style>
+  </head>
+  <body>
+    <label>Base URL</label>
+    <input id="baseUrl" placeholder="http://127.0.0.1:1234/v1" />
+    <label>Model</label>
+    <input id="model" placeholder="qwen2.5-7b-instruct" />
+    <label>Target Lang</label>
+    <input id="target" placeholder="ja" />
+    <button id="save">保存</button>
+    <script src="options.js"></script>
+  </body>
 </html>

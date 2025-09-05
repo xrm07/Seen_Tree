@@ -1,10 +1,80 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8" />
-</head>
-<body>
-  <button id="translate-page">このページを全文翻訳して置換</button>
-  <script src="popup.js"></script>
-</body>
-</html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>LM Studio Translator</title>
+    <style>
+      body { width: 360px; padding: 16px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans JP", sans-serif; color: #1f2937; }
+      h2 { font-size: 13px; margin: 0 0 8px; color: #6b7280; }
+      .seg { display: grid; grid-template-columns: 1fr 1fr; background: #eef2ff; border-radius: 8px; padding: 4px; margin-bottom: 16px; }
+      .seg button { border: 0; background: transparent; padding: 8px 6px; border-radius: 6px; cursor: pointer; font-weight: 600; color: #6b7280; }
+      .seg button.active { background: #3b82f6; color: #fff; }
+      .row { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+      .switch { position: relative; width: 42px; height: 24px; }
+      .switch input { position: absolute; opacity: 0; }
+      .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #e5e7eb; border-radius: 9999px; transition: .2s; }
+      .slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 9999px; transition: .2s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+      .switch input:checked + .slider { background: #60a5fa; }
+      .switch input:checked + .slider::before { transform: translateX(18px); }
+      .row .texts { line-height: 1.2; }
+      .row .title { font-weight: 700; font-size: 14px; }
+      .row .desc { font-size: 12px; color: #6b7280; margin-top: 4px; }
+      .cta { margin-top: 16px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); color: #fff; border: 0; width: 100%; padding: 12px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+      .footer { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 18px; }
+    </style>
+  </head>
+  <body>
+    <h2>翻訳方向</h2>
+    <div class="seg" role="tablist" aria-label="direction">
+      <button id="dir_enja" class="active" role="tab" aria-selected="true">英 - 日</button>
+      <button id="dir_jaen" role="tab" aria-selected="false">日 - 英</button>
+    </div>
+
+    <div class="row">
+      <label class="switch">
+        <input id="autoTranslate" type="checkbox" />
+        <span class="slider"></span>
+      </label>
+      <div class="texts">
+        <div class="title">自動翻訳</div>
+        <div class="desc">ページロード時に自動で翻訳を開始します</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="switch">
+        <input id="showSourceOnHover" type="checkbox" />
+        <span class="slider"></span>
+      </label>
+      <div class="texts">
+        <div class="title">ホバー時に原文を表示</div>
+        <div class="desc">翻訳済みテキストにマウスを重ねると、翻訳前の原文を表示します</div>
+      </div>
+    </div>
+
+    <div class="row" style="border-bottom: 0;">
+      <label class="switch">
+        <input id="showSelectionButton" type="checkbox" />
+        <span class="slider"></span>
+      </label>
+      <div class="texts">
+        <div class="title">テキスト選択時に翻訳ボタンを表示</div>
+        <div class="desc">テキストを選択した際に、翻訳を開始するためのボタンを表示します</div>
+      </div>
+    </div>
+
+    <div class="row" style="border-top: 1px solid #f3f4f6;">
+      <div style="grid-column: 1 / span 2;">
+        <div class="title" style="margin-bottom: 6px;">モデル</div>
+        <div style="display:flex; gap:8px;">
+          <select id="model" style="flex:1; padding: 6px 8px; border-radius: 6px; border: 1px solid #e5e7eb;"></select>
+          <button id="refreshModels" style="padding: 6px 8px; border-radius: 6px; border: 1px solid #e5e7eb; background:#fff; cursor:pointer;">再取得</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="btn_page" class="cta">このページを翻訳</button>
+    <div class="footer"><span id="ver"></span></div>
+    <script type="module" src="popup.js"></script>
+  </body>
+  </html>
