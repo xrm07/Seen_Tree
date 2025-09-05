@@ -1,3 +1,4 @@
+import { DEFAULT_MODEL } from "./constants.js";
 const DIR_KEYS = { enja: { source: "en", target: "ja" }, jaen: { source: "ja", target: "en" } };
 
 async function load() {
@@ -6,7 +7,7 @@ async function load() {
     autoTranslate: false,
     showSourceOnHover: false,
     showSelectionButton: true,
-    model: "qwen2.5-7b-instruct"
+    model: DEFAULT_MODEL
   });
 
   document.getElementById("autoTranslate").checked = !!data.autoTranslate;

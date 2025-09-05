@@ -1,7 +1,7 @@
 async function load() {
   const data = await chrome.storage.sync.get({
     baseUrl: "http://127.0.0.1:1234/v1",
-    model: "qwen2.5-7b-instruct",
+    model: DEFAULT_MODEL,
     target: "ja"
   });
   for (const k of Object.keys(data)) {
