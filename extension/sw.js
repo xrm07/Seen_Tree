@@ -18,7 +18,15 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
       const res = await fetch(url, { method: "GET" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      const ids = Array.isArray(json?.data) ? json.data.map(m => m.id).filter(Boolean) : [];
+      const normalize = (m) => {
+        if (typeof m === "string") return m;
+        return m?.id || m?.name || m?.model || null;
+      };
+      let ids = [];
+      if (Array.isArray(json?.data)) ids = json.data.map(normalize).filter(Boolean);
+      else if (Array.isArray(json?.models)) ids = json.models.map(normalize).filter(Boolean);
+      else if (Array.isArray(json)) ids = json.map(normalize).filter(Boolean);
+      else ids = [];
       sendResponse({ ok: true, models: ids });
     } catch (err) {
       sendResponse({ ok: false, error: String(err) });
