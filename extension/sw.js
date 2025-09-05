@@ -58,10 +58,12 @@ async function translateWithLMStudio({ baseUrl, model, target, text }) {
   const body = {
     model,
     messages: [
-      { role: "system", content: `Translate to ${target}. Preserve formatting. No explanations.` },
+      { role: "system", content: `You are a professional translator. Task: Translate the user's text into ${target}. Preserve original formatting, punctuation, whitespace, and inline code. Return only the translated text, no extra explanations.` },
       { role: "user", content: text }
     ],
-    temperature: 0.2
+    temperature: 0.2,
+    max_tokens: -1,
+    stream: false
   };
   const res = await fetch(url, {
     method: "POST",
@@ -70,7 +72,7 @@ async function translateWithLMStudio({ baseUrl, model, target, text }) {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
-  const content = json?.choices?.[0]?.message?.content;
+  const content = (json?.choices?.[0]?.message?.content || "").trim();
   if (!content) throw new Error("Empty response");
   return content;
 }
