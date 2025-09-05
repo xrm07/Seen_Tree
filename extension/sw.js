@@ -1,3 +1,4 @@
+import { DEFAULT_BASE_URL, DEFAULT_MODEL, DEFAULT_TARGET } from "./constants.js";
 self.addEventListener("message", () => {});
 chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
   if (msg?.type === "TRANSLATE") {
@@ -7,14 +8,14 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
       const translated = await translateWithLMStudio({ baseUrl, model, target, text });
       sendResponse({ ok: true, text: translated });
     } catch (err) {
-      sendResponse({ ok: false, error: String(err) });
+      sendResponse({ ok: false, error: String(err?.message || err) });
     }
     return true;
   }
   if (msg?.type === "LIST_MODELS") {
     try {
       const { baseUrl } = await loadSettingsWithDirection();
-      const url = (baseUrl || "http://127.0.0.1:1234/v1").replace(/\/$/, "") + "/models";
+      const url = (baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "") + "/models";
       const res = await fetch(url, { method: "GET" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
@@ -29,7 +30,7 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
       else ids = [];
       sendResponse({ ok: true, models: ids });
     } catch (err) {
-      sendResponse({ ok: false, error: String(err) });
+      sendResponse({ ok: false, error: String(err?.message || err) });
     }
     return true;
   }
@@ -51,9 +52,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 async function loadSettingsWithDirection(overrideDirection) {
   const data = await chrome.storage.sync.get({
-    baseUrl: "http://127.0.0.1:1234/v1",
-    model: "qwen2.5-7b-instruct",
-    target: "ja",
+    baseUrl: DEFAULT_BASE_URL,
+    model: DEFAULT_MODEL,
+    target: DEFAULT_TARGET,
     direction: "enja"
   });
   const direction = overrideDirection || data.direction || "enja";
@@ -78,7 +79,16 @@ async function translateWithLMStudio({ baseUrl, model, target, text }) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const errJson = await res.json();
+      detail = errJson?.error?.message || JSON.stringify(errJson);
+    } catch (_) {
+      try { detail = await res.text(); } catch (_) { /* noop */ }
+    }
+    throw new Error(`HTTP ${res.status} (${model} @ ${url}): ${detail}`);
+  }
   const json = await res.json();
   const content = (json?.choices?.[0]?.message?.content || "").trim();
   if (!content) throw new Error("Empty response");
