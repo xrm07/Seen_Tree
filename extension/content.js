@@ -28,7 +28,9 @@
     const sel = window.getSelection();
     const text = sel && sel.toString().trim();
     if (!text) { hideUI(); return; }
-    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    if (!sel || sel.rangeCount === 0) { hideUI(); return; }
+    let rect;
+    try { rect = sel.getRangeAt(0).getBoundingClientRect(); } catch (_) { hideUI(); return; }
     if (settings.showSelectionButton) {
       showButtonNear(rect, text);
     }
@@ -119,7 +121,7 @@
     while (nodes.length < 500 && walker.nextNode()) {
       const n = walker.currentNode;
       if (!n.nodeValue || !n.nodeValue.trim()) continue;
-      if (/^(SCRIPT|STYLE|NOSCRIPT)$/i.test(n.parentElement?.tagName || "")) continue;
+      if (/^(SCRIPT|STYLE|NOSCRIPT|IFRAME|CANVAS|SVG)$/i.test(n.parentElement?.tagName || "")) continue;
       nodes.push(n);
     }
     let done = 0;

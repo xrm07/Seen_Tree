@@ -73,7 +73,13 @@ async function populateModels() {
         opt.value = id; opt.textContent = id; sel.appendChild(opt);
       }
       const { model } = await chrome.storage.sync.get({ model: null });
-      if (model) sel.value = model;
+      if (model) {
+        if (![...sel.options].some(o => o.value === model)) {
+          const extra = document.createElement("option");
+          extra.value = model; extra.textContent = `${model} (保存)`; sel.appendChild(extra);
+        }
+        sel.value = model;
+      }
     } else {
       sel.innerHTML = '<option value="">取得失敗</option>';
     }

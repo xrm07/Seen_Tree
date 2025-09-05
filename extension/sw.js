@@ -58,7 +58,8 @@ async function loadSettingsWithDirection(overrideDirection) {
     direction: "enja"
   });
   const direction = overrideDirection || data.direction || "enja";
-  const target = direction === "jaen" ? "en" : "ja";
+  const targetFromDirection = direction === "jaen" ? "en" : "ja";
+  const target = (data.target || targetFromDirection);
   return { baseUrl: data.baseUrl, model: data.model, target, direction };
 }
 
