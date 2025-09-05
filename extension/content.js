@@ -48,8 +48,9 @@
       hoverButton.style.position = "fixed";
       hoverButton.style.zIndex = 2147483647;
       document.body.appendChild(hoverButton);
-      hoverButton.addEventListener("click", () => translateSelected(text, rect));
     }
+    // 毎回最新の選択内容でハンドラを更新
+    hoverButton.onclick = () => translateSelected(text, rect);
     hoverButton.style.top = `${rect.bottom + 6}px`;
     hoverButton.style.left = `${rect.right + 6}px`;
     hoverButton.style.display = "block";
@@ -61,9 +62,13 @@
   }
 
   async function translateSelected(text, rect) {
-    const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text });
-    if (!res?.ok) { console.error(res?.error); return; }
-    showPopup(rect, res.text);
+    try {
+      const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text, direction: settings.direction });
+      if (!res?.ok) throw new Error(res?.error || "Unknown error");
+      showPopup(rect, res.text);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   function showPopup(rect, content) {
