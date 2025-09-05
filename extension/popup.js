@@ -5,7 +5,8 @@ async function load() {
     direction: "enja",
     autoTranslate: false,
     showSourceOnHover: false,
-    showSelectionButton: true
+    showSelectionButton: true,
+    model: "qwen2.5-7b-instruct"
   });
 
   document.getElementById("autoTranslate").checked = !!data.autoTranslate;
@@ -14,6 +15,9 @@ async function load() {
   try { document.getElementById("ver").textContent = `version ${chrome.runtime.getManifest().version}`; } catch {}
 
   setDirectionUI(data.direction);
+  await populateModels();
+  const modelSel = document.getElementById("model");
+  if (modelSel && data.model) modelSel.value = data.model;
 }
 
 function setDirectionUI(dir) {
@@ -55,3 +59,31 @@ document.getElementById("btn_page").addEventListener("click", async () => {
 });
 
 document.addEventListener("DOMContentLoaded", load);
+
+async function populateModels() {
+  const sel = document.getElementById("model");
+  if (!sel) return;
+  sel.innerHTML = "<option>読み込み中...</option>";
+  try {
+    const res = await chrome.runtime.sendMessage({ type: "LIST_MODELS" });
+    if (res?.ok && Array.isArray(res.models)) {
+      sel.innerHTML = "";
+      for (const id of res.models) {
+        const opt = document.createElement("option");
+        opt.value = id; opt.textContent = id; sel.appendChild(opt);
+      }
+      const { model } = await chrome.storage.sync.get({ model: null });
+      if (model) sel.value = model;
+    } else {
+      sel.innerHTML = '<option value="">取得失敗</option>';
+    }
+  } catch (e) {
+    sel.innerHTML = '<option value="">エラー</option>';
+  }
+}
+
+document.getElementById("refreshModels")?.addEventListener("click", populateModels);
+document.getElementById("model")?.addEventListener("change", async (e) => {
+  const model = e.target.value;
+  await chrome.storage.sync.set({ model });
+});

@@ -11,6 +11,20 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
     }
     return true;
   }
+  if (msg?.type === "LIST_MODELS") {
+    try {
+      const { baseUrl } = await loadSettingsWithDirection();
+      const url = (baseUrl || "http://127.0.0.1:1234/v1").replace(/\/$/, "") + "/models";
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const ids = Array.isArray(json?.data) ? json.data.map(m => m.id).filter(Boolean) : [];
+      sendResponse({ ok: true, models: ids });
+    } catch (err) {
+      sendResponse({ ok: false, error: String(err) });
+    }
+    return true;
+  }
 });
 
 // Context menu to start page translation
