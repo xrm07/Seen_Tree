@@ -1,5 +1,4 @@
 import { DEFAULT_MODEL } from "./constants.js";
-const DIR_KEYS = { enja: { source: "en", target: "ja" }, jaen: { source: "ja", target: "en" } };
 
 async function load() {
   const data = await chrome.storage.sync.get({
@@ -13,7 +12,14 @@ async function load() {
   document.getElementById("autoTranslate").checked = !!data.autoTranslate;
   document.getElementById("showSourceOnHover").checked = !!data.showSourceOnHover;
   document.getElementById("showSelectionButton").checked = !!data.showSelectionButton;
-  try { document.getElementById("ver").textContent = `version ${chrome.runtime.getManifest().version}`; } catch {}
+  try {
+    const verEl = document.getElementById("ver");
+    if (verEl) verEl.textContent = `version ${chrome.runtime.getManifest().version}`;
+  } catch (err) {
+    console.warn("Failed to set version text", err);
+    const fallback = document.getElementById("ver");
+    if (fallback && !fallback.textContent) fallback.textContent = "version unavailable";
+  }
 
   setDirectionUI(data.direction);
   await populateModels();
@@ -63,15 +69,20 @@ document.addEventListener("DOMContentLoaded", load);
 
 async function populateModels() {
   const sel = document.getElementById("model");
+  const hint = document.getElementById("modelHint");
   if (!sel) return;
   sel.innerHTML = "<option>読み込み中...</option>";
   try {
     const res = await chrome.runtime.sendMessage({ type: "LIST_MODELS" });
     if (res?.ok && Array.isArray(res.models)) {
       sel.innerHTML = "";
-      for (const id of res.models) {
-        const opt = document.createElement("option");
-        opt.value = id; opt.textContent = id; sel.appendChild(opt);
+      if (res.models.length === 0) {
+        sel.innerHTML = '<option value="">(ロード済みモデルなし)</option>';
+      } else {
+        for (const id of res.models) {
+          const opt = document.createElement("option");
+          opt.value = id; opt.textContent = id; sel.appendChild(opt);
+        }
       }
       const { model } = await chrome.storage.sync.get({ model: null });
       if (model) {
@@ -81,11 +92,21 @@ async function populateModels() {
         }
         sel.value = model;
       }
+      if (hint) {
+        const used = res.usedUrl ? `取得元: ${res.usedUrl}` : "";
+        const current = sel.value ? `現在使用モデル: ${sel.value}` : "";
+        hint.textContent = [current, used].filter(Boolean).join(" / ");
+      }
     } else {
-      sel.innerHTML = '<option value="">取得失敗</option>';
+      sel.innerHTML = `<option value="">取得失敗${res?.error ? `: ${String(res.error)}` : ""}</option>`;
+      if (hint) {
+        const extra = Array.isArray(res?.attemptedUrls) && res.attemptedUrls.length ? `試行URL: ${res.attemptedUrls.join(", ")}` : "";
+        hint.textContent = ["LM Studioの起動とBase URLを確認してください", extra].filter(Boolean).join(" / ");
+      }
     }
   } catch (e) {
-    sel.innerHTML = '<option value="">エラー</option>';
+    sel.innerHTML = `<option value="">エラー: ${String(e && e.message || e)}</option>`;
+    if (hint) hint.textContent = "ネットワークエラーの可能性。LM StudioとURL設定を確認してください";
   }
 }
 

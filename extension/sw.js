@@ -1,54 +1,61 @@
 import { DEFAULT_BASE_URL, DEFAULT_MODEL, DEFAULT_TARGET } from "./constants.js";
 self.addEventListener("message", () => {});
-chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === "TRANSLATE") {
-    try {
-      const { text } = msg;
-      const { baseUrl, model, target, direction } = await loadSettingsWithDirection(msg.direction);
-      const translated = await translateWithLMStudio({ baseUrl, model, target, text });
-      sendResponse({ ok: true, text: translated });
-    } catch (err) {
-      sendResponse({ ok: false, error: String(err?.message || err) });
-    }
-    return true;
+    return handleTranslateRequest(msg);
   }
   if (msg?.type === "LIST_MODELS") {
-    try {
-      const { baseUrl } = await loadSettingsWithDirection();
-      const url = (baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "") + "/models";
-      const res = await fetch(url, { method: "GET" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const normalize = (m) => {
-        if (typeof m === "string") return m;
-        return m?.id || m?.name || m?.model || null;
-      };
-      let ids = [];
-      if (Array.isArray(json?.data)) ids = json.data.map(normalize).filter(Boolean);
-      else if (Array.isArray(json?.models)) ids = json.models.map(normalize).filter(Boolean);
-      else if (Array.isArray(json)) ids = json.map(normalize).filter(Boolean);
-      else ids = [];
-      sendResponse({ ok: true, models: ids });
-    } catch (err) {
-      sendResponse({ ok: false, error: String(err?.message || err) });
-    }
-    return true;
+    return handleListModelsRequest();
   }
+  return undefined;
 });
 
-// Context menu to start page translation
-chrome.runtime.onInstalled.addListener(() => {
+async function handleTranslateRequest(msg) {
   try {
-    chrome.contextMenus.create({ id: "lmstudio-translate-page", title: "このページを翻訳", contexts: ["page"] });
-  } catch {}
-});
-
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId === "lmstudio-translate-page" && tab?.id) {
-    const { direction } = await chrome.storage.sync.get({ direction: "enja" });
-    chrome.tabs.sendMessage(tab.id, { type: "START_PAGE_TRANSLATION", direction });
+    const { text } = msg;
+    const { baseUrl, model, target, direction } = await loadSettingsWithDirection(msg.direction);
+    const translated = await translateWithLMStudio({ baseUrl, model, target, text });
+    return { ok: true, text: translated, direction };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
   }
-});
+}
+
+async function handleListModelsRequest() {
+  const attempted = [];
+  try {
+    const { baseUrl } = await loadSettingsWithDirection();
+    const candidates = buildModelEndpointCandidates(baseUrl || DEFAULT_BASE_URL);
+    let lastError = null;
+    for (const u of candidates) {
+      try {
+        attempted.push(u);
+        const res = await fetch(u, { method: "GET" });
+        if (!res.ok) {
+          lastError = new Error(`HTTP ${res.status}`);
+          continue;
+        }
+        const json = await res.json();
+        const normalize = (m) => {
+          if (typeof m === "string") return m;
+          return m?.id || m?.name || m?.model || null;
+        };
+        let ids = [];
+        if (Array.isArray(json?.data)) ids = json.data.map(normalize).filter(Boolean);
+        else if (Array.isArray(json?.models)) ids = json.models.map(normalize).filter(Boolean);
+        else if (Array.isArray(json)) ids = json.map(normalize).filter(Boolean);
+        else ids = [];
+        return { ok: true, models: ids, usedUrl: u, attemptedUrls: attempted.slice() };
+      } catch (e) {
+        lastError = e;
+        // try next candidate
+      }
+    }
+    throw lastError || new Error("Failed to fetch models");
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err), attemptedUrls: attempted.slice() };
+  }
+}
 
 async function loadSettingsWithDirection(overrideDirection) {
   const data = await chrome.storage.sync.get({
@@ -63,8 +70,54 @@ async function loadSettingsWithDirection(overrideDirection) {
   return { baseUrl: data.baseUrl, model: data.model, target, direction };
 }
 
+// Context menu to start page translation
+chrome.runtime.onInstalled.addListener(() => {
+  try {
+    chrome.contextMenus.create({ id: "lmstudio-translate-page", title: "このページを翻訳", contexts: ["page"] });
+  } catch (error) {
+    console.warn("Failed to create context menu", error);
+  }
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === "lmstudio-translate-page" && tab?.id) {
+    const { direction } = await chrome.storage.sync.get({ direction: "enja" });
+    chrome.tabs.sendMessage(tab.id, { type: "START_PAGE_TRANSLATION", direction });
+  }
+});
+
+function buildModelEndpointCandidates(base) {
+  const b = (base || "").trim().replace(/\/$/, "");
+  const urls = [];
+  const versionedBase = ensureVersionedBase(b);
+  // Prefer versioned endpoint first to avoid 404s on bare hosts
+  urls.push(`${versionedBase}/models`);
+  // If user explicitly pointed at a non-versioned path, keep it as a fallback
+  if (versionedBase !== b) {
+    urls.push(`${b}/models`);
+  }
+  // Legacy LM Studio lives at /api/v0/models from the origin
+  try {
+    const { origin } = new URL(b);
+    urls.push(`${origin}/api/v0/models`);
+  } catch {
+    const legacyBase = b.replace(/\/v\d+\b$/, "");
+    urls.push(`${legacyBase || b}/api/v0/models`);
+  }
+  // Deduplicate while preserving order
+  return Array.from(new Set(urls));
+}
+
+function ensureVersionedBase(base) {
+  const trimmed = (base || "").trim().replace(/\/$/, "");
+  if (!trimmed) return "";
+  if (/\/api\/v\d+\b/.test(trimmed)) return trimmed;
+  if (/\/v\d+\b/.test(trimmed)) return trimmed;
+  return `${trimmed}/v1`;
+}
+
 async function translateWithLMStudio({ baseUrl, model, target, text }) {
-  const url = baseUrl.replace(/\/$/, "") + "/chat/completions";
+  const url = buildApiUrl(baseUrl, "/chat/completions");
   const body = {
     model,
     messages: [
@@ -85,8 +138,13 @@ async function translateWithLMStudio({ baseUrl, model, target, text }) {
     try {
       const errJson = await res.json();
       detail = errJson?.error?.message || JSON.stringify(errJson);
-    } catch (_) {
-      try { detail = await res.text(); } catch (_) { /* noop */ }
+    } catch (parseError) {
+      console.debug("Failed to parse LM Studio error response", parseError);
+      try {
+        detail = await res.text();
+      } catch (textError) {
+        console.debug("Failed to read LM Studio error body", textError);
+      }
     }
     throw new Error(`HTTP ${res.status} (${model} @ ${url}): ${detail}`);
   }
@@ -94,4 +152,13 @@ async function translateWithLMStudio({ baseUrl, model, target, text }) {
   const content = (json?.choices?.[0]?.message?.content || "").trim();
   if (!content) throw new Error("Empty response");
   return content;
+}
+
+function buildApiUrl(baseUrl, path) {
+  const trimmed = (baseUrl || "").trim().replace(/\/$/, "");
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  if (!trimmed) return suffix;
+  if (/\/api\/v\d+\b/.test(trimmed)) return `${trimmed}${suffix}`;
+  if (/\/v\d+\b/.test(trimmed)) return `${trimmed}${suffix}`;
+  return `${trimmed}/v1${suffix}`;
 }
