@@ -1,11 +1,15 @@
 (() => {
+  const DEFAULT_MAX_NODES = 500;
+  const MIN_MAX_NODES = 50;
+  const MAX_MAX_NODES = 5000;
   let hoverButton = null;
   let resultPopup = null;
   let settings = {
     direction: "enja",
     autoTranslate: false,
     showSourceOnHover: false,
-    showSelectionButton: true
+    showSelectionButton: true,
+    maxNodes: DEFAULT_MAX_NODES
   };
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -30,7 +34,13 @@
     if (!text) { hideUI(); return; }
     if (!sel || sel.rangeCount === 0) { hideUI(); return; }
     let rect;
-    try { rect = sel.getRangeAt(0).getBoundingClientRect(); } catch (_) { hideUI(); return; }
+    try {
+      rect = sel.getRangeAt(0).getBoundingClientRect();
+    } catch (error) {
+      console.warn("Failed to read selection bounds", error);
+      hideUI();
+      return;
+    }
     if (settings.showSelectionButton) {
       showButtonNear(rect, text);
     }
@@ -115,10 +125,21 @@
   }
   function hideProgress() { const o = document.getElementById("lmst-progress"); if (o) o.remove(); }
 
+  function resolveMaxNodes(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return DEFAULT_MAX_NODES;
+    const intVal = Math.floor(numeric);
+    if (intVal < MIN_MAX_NODES || intVal > MAX_MAX_NODES) return DEFAULT_MAX_NODES;
+    if (intVal <= 0) return DEFAULT_MAX_NODES;
+    return intVal;
+  }
+
   async function translateWholePage() {
+    cancelRequested = false;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const nodes = [];
-    while (nodes.length < 500 && walker.nextNode()) {
+    const maxNodes = resolveMaxNodes(settings.maxNodes);
+    while (nodes.length < maxNodes && walker.nextNode()) {
       const n = walker.currentNode;
       if (!n.nodeValue || !n.nodeValue.trim()) continue;
       if (/^(SCRIPT|STYLE|NOSCRIPT|IFRAME|CANVAS|SVG)$/i.test(n.parentElement?.tagName || "")) continue;
@@ -140,13 +161,12 @@
             n.nodeValue = res.text;
           }
         }
-      } catch {}
+      } catch (error) {
+        console.error("Failed to translate text node", error);
+      }
       await new Promise(r => setTimeout(r, 50));
       done += 1; updateProgress(done, nodes.length);
     }
   }
 
-  function startPageTranslation() {
-    cancelRequested = false; showProgress(); translateWholePage().finally(hideProgress);
-  }
 })();
