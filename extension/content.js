@@ -9,6 +9,7 @@
     autoTranslate: false,
     showSourceOnHover: false,
     showSelectionButton: true,
+    model: DEFAULT_MODEL,
     maxNodes: DEFAULT_MAX_NODES
   };
 
@@ -75,7 +76,7 @@
 
   async function translateSelected(text, rect) {
     try {
-      const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text, direction: settings.direction });
+      const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text, direction: settings.direction, model: settings.model });
       if (!res?.ok) throw new Error(res?.error || "Unknown error");
       showPopup(rect, res.text);
     } catch (err) {
@@ -149,7 +150,7 @@
     for (const n of nodes) {
       if (cancelRequested) break;
       try {
-        const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text: n.nodeValue, direction: settings.direction });
+        const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text: n.nodeValue, direction: settings.direction, model: settings.model });
         if (res?.ok) {
           if (settings.showSourceOnHover) {
             const original = n.nodeValue;
