@@ -12,8 +12,10 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 async function handleTranslateRequest(msg) {
   try {
-    const { text } = msg;
-    const { baseUrl, model, target, direction } = await loadSettingsWithDirection(msg.direction);
+    const { text, model: requestModel } = msg;
+    const settings = await loadSettingsWithDirection(msg.direction);
+    const model = requestModel || settings.model;
+    const { baseUrl, target, direction } = settings;
     const translated = await translateWithLMStudio({ baseUrl, model, target, text });
     return { ok: true, text: translated, direction };
   } catch (err) {
@@ -51,7 +53,7 @@ async function handleListModelsRequest() {
         // try next candidate
       }
     }
-    throw lastError || new Error("Failed to fetch models");
+    throw lastError || new Error("モデル一覧の取得に失敗しました");
   } catch (err) {
     return { ok: false, error: String(err?.message || err), attemptedUrls: attempted.slice() };
   }
@@ -146,11 +148,11 @@ async function translateWithLMStudio({ baseUrl, model, target, text }) {
         console.debug("Failed to read LM Studio error body", textError);
       }
     }
-    throw new Error(`HTTP ${res.status} (${model} @ ${url}): ${detail}`);
+    throw new Error(`翻訳エラー: HTTP ${res.status} (${model} @ ${url}): ${detail}`);
   }
   const json = await res.json();
   const content = (json?.choices?.[0]?.message?.content || "").trim();
-  if (!content) throw new Error("Empty response");
+  if (!content) throw new Error("翻訳結果が空です");
   return content;
 }
 
