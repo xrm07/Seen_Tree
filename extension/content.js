@@ -1,4 +1,11 @@
-(() => {
+(async () => {
+  let DEFAULT_MODEL = "google/gemma-3-1b";
+  try {
+    const constants = await import(chrome.runtime.getURL("constants.js"));
+    if (constants?.DEFAULT_MODEL) DEFAULT_MODEL = constants.DEFAULT_MODEL;
+  } catch (error) {
+    console.error("Failed to load constants.js, using fallback defaults", error);
+  }
   const DEFAULT_MAX_NODES = 500;
   const MIN_MAX_NODES = 50;
   const MAX_MAX_NODES = 5000;
