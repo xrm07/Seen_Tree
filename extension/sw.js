@@ -64,7 +64,7 @@ async function loadSettingsWithDirection(overrideDirection) {
   const direction = overrideDirection ?? data.direction ?? "enja";
   const baseUrl = data.baseUrl || DEFAULT_BASE_URL;
   const model = data.model || DEFAULT_MODEL;
-  const fallbackTarget = direction === "jaen" ? "en" : DEFAULT_TARGET;
+  const fallbackTarget = direction === "jaen" ? "en" : direction === "enja" ? "ja" : DEFAULT_TARGET;
   const storedTarget = typeof data.target === "string" && data.target.trim() ? data.target.trim().toLowerCase() : null;
   const target = storedTarget ? storedTarget : fallbackTarget;
   return { baseUrl, model, target, direction };
