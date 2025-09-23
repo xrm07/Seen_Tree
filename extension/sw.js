@@ -60,16 +60,14 @@ async function handleListModelsRequest() {
 }
 
 async function loadSettingsWithDirection(overrideDirection) {
-  const data = await chrome.storage.sync.get({
-    baseUrl: DEFAULT_BASE_URL,
-    model: DEFAULT_MODEL,
-    target: DEFAULT_TARGET,
-    direction: "enja"
-  });
-  const direction = overrideDirection || data.direction || "enja";
-  const targetFromDirection = direction === "jaen" ? "en" : "ja";
-  const target = (data.target || targetFromDirection);
-  return { baseUrl: data.baseUrl, model: data.model, target, direction };
+  const data = await chrome.storage.sync.get(["baseUrl", "model", "target", "direction"]);
+  const direction = overrideDirection ?? data.direction ?? "enja";
+  const baseUrl = data.baseUrl || DEFAULT_BASE_URL;
+  const model = data.model || DEFAULT_MODEL;
+  const fallbackTarget = direction === "jaen" ? "en" : direction === "enja" ? "ja" : DEFAULT_TARGET;
+  const storedTarget = typeof data.target === "string" && data.target.trim() ? data.target.trim().toLowerCase() : null;
+  const target = storedTarget ? storedTarget : fallbackTarget;
+  return { baseUrl, model, target, direction };
 }
 
 // Context menu to start page translation
