@@ -9,7 +9,7 @@ LM Studio のローカル API（OpenAI 互換）を呼び出して、選択テ�
 - 設定同期: 翻訳方向（英→日 / 日→英）、自動翻訳、原文ホバー表示、選択ボタン表示などを `chrome.storage.sync` に保存。
 
 ## 前提条件
-- LM Studio の Local Server 機能を有効化し、OpenAI 互換 API を `http://localhost:1234/v1`（または `127.0.0.1`）で公開していること。  
+- LM Studio の Local Server 機能を有効化し、OpenAI 互換 API を `http://localhost:1234/v1`（または `127.0.0.1`）で公開していること。
   詳細: [LM Studio Docs – OpenAI Compatibility API](https://lmstudio.ai/docs/local-server/openai-compatibility-api)
 - Google Chrome (MV3 対応版)。
 
