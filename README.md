@@ -1,114 +1,86 @@
 # LM Studio Translator (MV3, minimal)
 
-LM Studio互換APIのみを叩く最小Chrome拡張。
-要件:
+LM Studio のローカル API（OpenAI 互換）を呼び出して、選択テキストやページ全文を最小構成で翻訳する Chrome 拡張です。
 
-LM StudioのAPI設定で作動
-選択テキスト時に選択近傍へ拡張アイコンを出し、クリックで翻訳→結果を近傍ポップ表示
-右上の拡張ポップから「全文翻訳」開始。終了後ページ上テキストを置換
-1. 構成
+## 主な機能
+- 選択テキスト翻訳: テキストをドラッグで選び、近傍に表示される「翻訳」ボタンで即時翻訳。
+- ページ全文翻訳: ポップアップのボタン、またはページのコンテキストメニュー「このページを翻訳」から一括処理。
+- モデル切り替え: LM Studio の `/models` エンドポイントからロード済みモデル一覧を取得し、ポップアップで選択。
+- 設定同期: 翻訳方向（英→日 / 日→英）、自動翻訳、原文ホバー表示、選択ボタン表示などを `chrome.storage.sync` に保存。
 
+## 前提条件
+- LM Studio の Local Server 機能を有効化し、OpenAI 互換 API を `http://localhost:1234/v1`（または `127.0.0.1`）で公開していること。
+  詳細: [LM Studio Docs – OpenAI Compatibility API](https://lmstudio.ai/docs/local-server/openai-compatibility-api)
+- Google Chrome (MV3 対応版)。
 
-データフロー
+## 構成とデータフロー
+1. `content.js` が選択テキストやページ DOM テキストノードを取得。
+2. `chrome.runtime.sendMessage` で Service Worker (`sw.js`) に翻訳要求 (`TRANSLATE`) やモデル一覧要求 (`LIST_MODELS`) を送信。
+3. `sw.js` が `fetch` で LM Studio の `/v1/chat/completions` または `/models` にアクセスし、結果を返却。
+4. `content.js` が結果をポップ表示、またはページノードのテキストを置換。
 
-content.js → chrome.runtime.sendMessage → sw.js → fetch( LM Studio /v1/chat/completions ) → 応答返却
-全文はcontent.jsがDOMテキストノードを列挙→逐次翻訳→置換
-2. インストール
+## インストール手順
+1. LM Studio を起動し、左下の **Developer > Local Server** から API サーバーを開始（デフォルトでポート `1234`）。
+2. このリポジトリを取得し、`extension/` ディレクトリを保持する。
+3. Chrome で `chrome://extensions` を開き、右上「デベロッパーモード」をオン。
+4. 「パッケージ化されていない拡張機能を読み込む」→ このリポジトリの `extension/` を選択。
+5. オプションページ（拡張の「詳細」→「拡張機能のオプション」）で Base URL、モデル、翻訳言語を設定。
 
-LM StudioでローカルAPIサーバを起動（Developer/Local Server）
-このリポジトリを取得
-Chrome → chrome://extensions → デベロッパーモード → パッケージ化されていない拡張機能を読み込む → /extensionを選択
-拡張の「詳細」→「拡張機能のオプション」から以下を設定
-Base URL: http://127.0.0.1:1234/v1
-Model: 例 qwen2.5-7b-instruct（LM Studioでロードしたモデル名）
-Target Lang: ja など
-3. 使い方
+## 使い方
+### 選択テキストを翻訳
+1. ページ上でテキストを選択。
+2. 近傍に表示される「翻訳」ボタンをクリック。
+3. ボタンの近辺にポップアップで翻訳結果が表示され、クリックすると閉じる。
 
-選択翻訳（近傍ポップ）
+### ページ全文を翻訳
+- 拡張ポップアップで「このページを全文翻訳して置換」を押す。
+- もしくは、ページ上で右クリック→「このページを翻訳」を選択（コンテキストメニュー）。
+- 進捗オーバーレイに処理件数が表示され、設定でキャンセルも可能。
 
-ページ上でテキストを選択
-選択近くに小ボタン「翻訳」が出る
-ボタンを押す → 近傍に結果ポップが表示
-全文翻訳（置換）
+### ポップアップで設定できる項目
+- 翻訳方向（`enja` / `jaen`）。
+- 自動全文翻訳（ページロード時に開始）。
+- 原文ホバー表示（翻訳結果に原文を `title` 属性で保持）。
+- 選択ボタンの表示有無。
+- モデル選択（一覧再取得、保存済みモデルの保持）。
 
-ブラウザ右上の拡張アイコンを開く
-「このページを全文翻訳して置換」を押す
-完了後、ページ内のテキストノードが翻訳結果で置換
-4. 設定・権限
+## 設定と権限
+- `chrome.storage.sync` に Base URL / モデル名 / 方向 / UI 設定を保存。同期上限は約 100 KB。
+- `manifest.json` の主要権限:
+  - `permissions`: `storage`, `activeTab`, `scripting`, `contextMenus`
+  - `host_permissions`: `http://127.0.0.1/*`, `http://localhost/*`
+- 背景スクリプトは MV3 Service Worker (`sw.js`) として動作し、ネットワークアクセスとコンテキストメニュー登録を担当。
 
-host_permissions:
-http://127.0.0.1:1234/*
-http://localhost:1234/*
-permissions: storage, activeTab, scripting
-設定保存は chrome.storage.sync（モデル名・Base URL・Target）。同期上限は約100KB
-5. LM Studio API（OpenAI互換）
+## LM Studio API 呼び出し例
+```http
+POST http://127.0.0.1:1234/v1/chat/completions
+Content-Type: application/json
 
-エンドポイント: POST {BASE}/chat/completions
-例ボディ:
 {
-  "model": "qwen2.5-7b-instruct",
+  "model": "google/gemma-3-1b",
   "messages": [
-    { "role": "system", "content": "Translate to ja. Preserve formatting. No explanations." },
-    { "role": "user", "content": "source text..." }
+    { "role": "system", "content": "Translate the user's text into ja. Preserve formatting." },
+    { "role": "user", "content": "source text" }
   ],
-  "temperature": 0.2
+  "temperature": 0.2,
+  "stream": false
 }
+```
+- モデル一覧取得は `GET http://127.0.0.1:1234/v1/models` を利用（バージョン付きエンドポイントが優先され、フォールバックで `/api/v0/models` も試行）。
 
-  •	応答: OpenAI形式。choices[0].message.contentを取り出して使用
-  •	LM StudioのローカルAPIは通常APIキー不要
+## 主要ファイル
+- `extension/manifest.json`: MV3 用 manifest。バージョン `0.1.1`、コンテキストメニュー許可などを定義。
+- `extension/sw.js`: 翻訳・モデル一覧リクエストの仲介とエラーハンドリング、コンテキストメニュー登録。
+- `extension/content.js`: 選択テキスト UI、全文翻訳ロジック、進捗表示。
+- `extension/popup.{html,js}`: 設定 UI とメッセージ送信、モデル一覧更新。
+- `extension/options.{html,js}`: Base URL / モデル / ターゲット言語の保存。
+- `extension/constants.js`: デフォルトの Base URL・モデル・ターゲット言語を定義。
 
-⸻
+## トラブルシュート
+- 応答が返ってこない: LM Studio の Local Server が起動しているか、Base URL が `/v1` 付きになっているかを確認。
+- モデル一覧が空: LM Studio の UI でモデルがロード済みか確認。ポップアップの「再取得」を押して `/models` エンドポイントへの接続を再試行。
+- 全文翻訳が途中で止まる: 進捗オーバーレイのキャンセルボタンを誤って押していないか、`maxNodes` 設定値を `options` 画面で調整。
+- CORS や権限エラー: `host_permissions` に対象ホストが含まれているか、拡張を再読み込みして設定を反映させる。
 
-主要ファイル
-manifest.json（抜粋）
-
-```json
-{
-  "manifest_version": 3,
-  "name": "LM Studio Translator (minimal)",
-  "version": "0.1.0",
-  "permissions": [
-    "storage",
-    "activeTab",
-    "scripting"
-  ],
-  "host_permissions": [
-    "http://127.0.0.1:1234/",
-    "http://localhost:1234/"
-  ],
-  "background": {
-    "service_worker": "sw.js",
-    "type": "module"
-  },
-  "action": {
-    "default_title": "Translate",
-    "default_popup": "popup.html"
-  },
-  "options_page": "options.html",
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ]
-}
-
-sw.js（役割） • 受信: { type: "TRANSLATE", text } • 送信: { ok: true, text } or { ok: false, error } • fetchでLM Studioの/v1/chat/completionsへPOST
-
-content.js（役割） • mouseupで選択文字列を取得 • 近傍に「翻訳」ボタンを描画→クリック時にSWへメッセージ • 結果を近傍ポップに描画 • START_PAGE_TRANSLATION受信でページ全文を逐次翻訳して置換 • 過負荷防止のため最大処理ノード数を制限（必要に応じ調整）
-
-popup.html / popup.js • ボタン押下でtabs.sendMessage→START_PAGE_TRANSLATION
-
-options.html / options.js • Base URL / Model / Targetをstorage.syncに保存・読込
-
-⸻
-
-開発メモ • MV3は永続BGではなくService Worker。状態はストレージ側で管理 • クロスオリジンfetchはSW側で実行。host_permissionsで許可しておく • コンテントスクリプトはDOM操作とSWメッセージングに専念 • 同期ストレージは軽設定向け。大量データはstorage.localやIndexedDBへ
-⸻
-
-トラブルシュート • 応答が空: モデル未指定、サーバ未起動、Base URL誤りを確認 • CORS/権限エラー: host_permissionsとSW側でのfetch実行を確認 • 全文翻訳で欠落: 非表示要素や除外タグ（SCRIPT等）は対象外。上限数も確認
-⸻
-
-ライセンス • 任意（テンプレート）。Plamo等の商標やトレードドレスの模倣は回避
-出典:
+## ライセンス
+- LICENSE ファイルを参照。ブランドやロゴの無断使用は避けてください。
