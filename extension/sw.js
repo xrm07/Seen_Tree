@@ -15,8 +15,8 @@ async function handleTranslateRequest(msg) {
     const { text, model: requestModel } = msg;
     const settings = await loadSettingsWithDirection(msg.direction);
     const model = requestModel || settings.model;
-    const { baseUrl, target, direction } = settings;
-    const translated = await translateWithLMStudio({ baseUrl, model, target, text });
+    const { baseUrl, target, direction, apiKey } = settings;
+    const translated = await translateWithLMStudio({ baseUrl, model, target, text, apiKey });
     return { ok: true, text: translated, direction };
   } catch (err) {
     return { ok: false, error: String(err?.message || err) };
@@ -26,13 +26,14 @@ async function handleTranslateRequest(msg) {
 async function handleListModelsRequest() {
   const attempted = [];
   try {
-    const { baseUrl } = await loadSettingsWithDirection();
+    const { baseUrl, apiKey } = await loadSettingsWithDirection();
     const candidates = buildModelEndpointCandidates(baseUrl || DEFAULT_BASE_URL);
     let lastError = null;
     for (const u of candidates) {
       try {
         attempted.push(u);
-        const res = await fetch(u, { method: "GET" });
+        const headers = buildAuthHeaders(apiKey);
+        const res = await fetch(u, headers ? { method: "GET", headers } : { method: "GET" });
         if (!res.ok) {
           lastError = new Error(`HTTP ${res.status}`);
           continue;
@@ -60,14 +61,15 @@ async function handleListModelsRequest() {
 }
 
 async function loadSettingsWithDirection(overrideDirection) {
-  const data = await chrome.storage.sync.get(["baseUrl", "model", "target", "direction"]);
+  const data = await chrome.storage.sync.get(["baseUrl", "model", "target", "direction", "apiKey"]);
   const direction = overrideDirection ?? data.direction ?? "enja";
   const baseUrl = data.baseUrl || DEFAULT_BASE_URL;
   const model = data.model || DEFAULT_MODEL;
   const fallbackTarget = direction === "jaen" ? "en" : direction === "enja" ? "ja" : DEFAULT_TARGET;
   const storedTarget = typeof data.target === "string" && data.target.trim() ? data.target.trim().toLowerCase() : null;
   const target = storedTarget ? storedTarget : fallbackTarget;
-  return { baseUrl, model, target, direction };
+  const apiKey = typeof data.apiKey === "string" ? data.apiKey.trim() : "";
+  return { baseUrl, model, target, direction, apiKey };
 }
 
 // Context menu to start page translation
@@ -91,10 +93,15 @@ function buildModelEndpointCandidates(base) {
   const urls = [];
   const versionedBase = ensureVersionedBase(b);
   // Prefer versioned endpoint first to avoid 404s on bare hosts
-  urls.push(`${versionedBase}/models`);
-  // If user explicitly pointed at a non-versioned path, keep it as a fallback
-  if (versionedBase !== b) {
-    urls.push(`${b}/models`);
+  const baseCandidates = [];
+  if (versionedBase) baseCandidates.push(versionedBase);
+  if (b) baseCandidates.push(b);
+  const bareBase = stripFinalVersionSegment(b);
+  if (bareBase && bareBase !== b) {
+    baseCandidates.push(bareBase);
+  }
+  for (const candidate of baseCandidates) {
+    urls.push(`${candidate}/models`);
   }
   // Legacy LM Studio lives at /api/v0/models from the origin
   try {
@@ -116,7 +123,19 @@ function ensureVersionedBase(base) {
   return `${trimmed}/v1`;
 }
 
-async function translateWithLMStudio({ baseUrl, model, target, text }) {
+function stripFinalVersionSegment(base) {
+  const trimmed = (base || "").trim().replace(/\/$/, "");
+  if (!trimmed) return "";
+  return trimmed.replace(/\/(api\/)?v\d+\b$/, (match, apiPrefix) => (apiPrefix ? "\/api" : ""));
+}
+
+function buildAuthHeaders(apiKey) {
+  const key = typeof apiKey === "string" ? apiKey.trim() : "";
+  if (!key) return null;
+  return { Authorization: key.startsWith("Bearer ") ? key : `Bearer ${key}` };
+}
+
+async function translateWithLMStudio({ baseUrl, model, target, text, apiKey }) {
   const url = buildApiUrl(baseUrl, "/chat/completions");
   const body = {
     model,
@@ -128,9 +147,12 @@ async function translateWithLMStudio({ baseUrl, model, target, text }) {
     max_tokens: -1,
     stream: false
   };
+  const headers = { "Content-Type": "application/json" };
+  const authHeaders = buildAuthHeaders(apiKey);
+  if (authHeaders) Object.assign(headers, authHeaders);
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body)
   });
   if (!res.ok) {
