@@ -7,6 +7,9 @@
     } else {
       console.warn("constants.js loaded, but DEFAULT_MODEL is missing or not a string. Using fallback default.");
     }
+  } catch (error) {
+    console.warn("Failed to load constants.js. Using fallback default model.", error);
+  }
   const DEFAULT_MAX_NODES = 500;
   const MIN_MAX_NODES = 50;
   const MAX_MAX_NODES = 5000;

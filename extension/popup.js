@@ -72,6 +72,13 @@ async function populateModels() {
   const hint = document.getElementById("modelHint");
   if (!sel) return;
   sel.innerHTML = "<option>読み込み中...</option>";
+  let savedModel = null;
+  try {
+    const stored = await chrome.storage.sync.get({ model: null });
+    savedModel = stored?.model || null;
+  } catch (err) {
+    console.warn("Failed to load saved model", err);
+  }
   try {
     const res = await chrome.runtime.sendMessage({ type: "LIST_MODELS" });
     if (res?.ok && Array.isArray(res.models)) {
@@ -84,13 +91,12 @@ async function populateModels() {
           opt.value = id; opt.textContent = id; sel.appendChild(opt);
         }
       }
-      const { model } = await chrome.storage.sync.get({ model: null });
-      if (model) {
-        if (![...sel.options].some(o => o.value === model)) {
+      if (savedModel) {
+        if (![...sel.options].some(o => o.value === savedModel)) {
           const extra = document.createElement("option");
-          extra.value = model; extra.textContent = `${model} (保存)`; sel.appendChild(extra);
+          extra.value = savedModel; extra.textContent = `${savedModel} (保存)`; sel.appendChild(extra);
         }
-        sel.value = model;
+        sel.value = savedModel;
       }
       if (hint) {
         const used = res.usedUrl ? `取得元: ${res.usedUrl}` : "";
@@ -98,15 +104,22 @@ async function populateModels() {
         hint.textContent = [current, used].filter(Boolean).join(" / ");
       }
     } else {
-      sel.innerHTML = `<option value="">取得失敗${res?.error ? `: ${String(res.error)}` : ""}</option>`;
+      const failureText = renderFailureOptions(sel, savedModel, res?.error);
       if (hint) {
+        const segments = [failureText || "取得失敗", "LM Studioの起動とBase URLを確認してください"];
+        if (savedModel) segments.push(`保存済みモデル: ${savedModel}`);
         const extra = Array.isArray(res?.attemptedUrls) && res.attemptedUrls.length ? `試行URL: ${res.attemptedUrls.join(", ")}` : "";
-        hint.textContent = ["LM Studioの起動とBase URLを確認してください", extra].filter(Boolean).join(" / ");
+        if (extra) segments.push(extra);
+        hint.textContent = segments.filter(Boolean).join(" / ");
       }
     }
   } catch (e) {
-    sel.innerHTML = `<option value="">エラー: ${String(e && e.message || e)}</option>`;
-    if (hint) hint.textContent = "ネットワークエラーの可能性。LM StudioとURL設定を確認してください";
+    const failureText = renderFailureOptions(sel, savedModel, e?.message || e, true);
+    if (hint) {
+      const segments = [failureText || "取得失敗", "ネットワークエラーの可能性。LM StudioとURL設定を確認してください"];
+      if (savedModel) segments.push(`保存済みモデル: ${savedModel}`);
+      hint.textContent = segments.filter(Boolean).join(" / ");
+    }
   }
 }
 
@@ -115,3 +128,24 @@ document.getElementById("model")?.addEventListener("change", async (e) => {
   const model = e.target.value;
   await chrome.storage.sync.set({ model });
 });
+
+function renderFailureOptions(sel, savedModel, error, disableErrorOption = false) {
+  if (!sel) return "";
+  const message = error ? `取得失敗: ${String(error)}` : "取得失敗";
+  sel.innerHTML = "";
+  const errOpt = document.createElement("option");
+  errOpt.value = "";
+  errOpt.textContent = message;
+  if (disableErrorOption) errOpt.disabled = true;
+  sel.appendChild(errOpt);
+  if (savedModel) {
+    const savedOpt = document.createElement("option");
+    savedOpt.value = savedModel;
+    savedOpt.textContent = `${savedModel} (保存)`;
+    sel.appendChild(savedOpt);
+    sel.value = savedModel;
+  } else if (!disableErrorOption) {
+    sel.value = "";
+  }
+  return message;
+}

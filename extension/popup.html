@@ -21,6 +21,7 @@
       .row .desc { font-size: 12px; color: #6b7280; margin-top: 4px; }
       .cta { margin-top: 16px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); color: #fff; border: 0; width: 100%; padding: 12px 14px; border-radius: 10px; font-weight: 700; cursor: pointer; }
       .footer { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 18px; }
+      #modelHint { margin-top: 6px; font-size: 11px; color: #6b7280; min-height: 1.2em; }
     </style>
   </head>
   <body>
@@ -70,6 +71,7 @@
           <select id="model" style="flex:1; padding: 6px 8px; border-radius: 6px; border: 1px solid #e5e7eb;"></select>
           <button id="refreshModels" style="padding: 6px 8px; border-radius: 6px; border: 1px solid #e5e7eb; background:#fff; cursor:pointer;">再取得</button>
         </div>
+        <div id="modelHint" aria-live="polite"></div>
       </div>
     </div>
 
