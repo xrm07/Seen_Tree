@@ -4,7 +4,8 @@ async function load() {
   const data = await chrome.storage.sync.get({
     baseUrl: DEFAULT_BASE_URL,
     model: DEFAULT_MODEL,
-    target: DEFAULT_TARGET
+    target: DEFAULT_TARGET,
+    apiKey: ""
   });
   for (const k of Object.keys(data)) {
     const el = document.getElementById(k);
@@ -48,6 +49,7 @@ function validateInputs() {
   const baseUrlInput = document.getElementById("baseUrl");
   const modelInput = document.getElementById("model");
   const targetInput = document.getElementById("target");
+  const apiKeyInput = document.getElementById("apiKey");
   const errors = [];
   const fieldErrors = {};
 
@@ -79,10 +81,17 @@ function validateInputs() {
     fieldErrors.target = "Target must be 2-5 alphabetic characters.";
   }
 
+  const apiKeyRaw = apiKeyInput?.value || "";
+  const apiKey = apiKeyRaw.trim();
+  if (apiKey && /\s{2,}/.test(apiKey) && !apiKey.startsWith("Bearer ")) {
+    fieldErrors.apiKey = "If provided, API key should not contain repeated spaces.";
+  }
+
   const entries = [
     { id: "baseUrl", message: fieldErrors.baseUrl },
     { id: "model", message: fieldErrors.model },
-    { id: "target", message: fieldErrors.target }
+    { id: "target", message: fieldErrors.target },
+    { id: "apiKey", message: fieldErrors.apiKey }
   ];
 
   let firstInvalid = null;
@@ -111,7 +120,8 @@ function validateInputs() {
   return {
     baseUrl,
     model,
-    target: target.toLowerCase()
+    target: target.toLowerCase(),
+    apiKey
   };
 }
 
