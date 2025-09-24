@@ -123,7 +123,6 @@ async function populateModels() {
   }
 }
 
-
 document.getElementById("refreshModels")?.addEventListener("click", populateModels);
 document.getElementById("model")?.addEventListener("change", async (e) => {
   const model = e.target.value;
