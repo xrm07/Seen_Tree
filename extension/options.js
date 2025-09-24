@@ -21,9 +21,6 @@ const statusRegion = (() => {
   el.id = "statusMessage";
   el.setAttribute("role", "status");
   el.setAttribute("aria-live", "polite");
-  el.style.marginTop = "12px";
-  el.style.minHeight = "1.2em";
-  el.style.fontSize = "13px";
   document.body.appendChild(el);
   return el;
 })();

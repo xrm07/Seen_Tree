@@ -1,13 +1,21 @@
 import { DEFAULT_BASE_URL, DEFAULT_MODEL, DEFAULT_TARGET } from "./constants.js";
 self.addEventListener("message", () => {});
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "TRANSLATE") {
-    return handleTranslateRequest(msg);
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type !== "TRANSLATE" && msg?.type !== "LIST_MODELS") {
+    return undefined;
   }
-  if (msg?.type === "LIST_MODELS") {
-    return handleListModelsRequest();
-  }
-  return undefined;
+  (async () => {
+    try {
+      const result = msg.type === "TRANSLATE"
+        ? await handleTranslateRequest(msg)
+        : await handleListModelsRequest();
+      sendResponse(result);
+      return;
+    } catch (err) {
+      sendResponse({ ok: false, error: String(err?.message || err) });
+    }
+  })();
+  return true;
 });
 
 async function handleTranslateRequest(msg) {
