@@ -134,7 +134,7 @@ function ensureVersionedBase(base) {
 function stripFinalVersionSegment(base) {
   const trimmed = (base || "").trim().replace(/\/$/, "");
   if (!trimmed) return "";
-  return trimmed.replace(/\/(api\/)?v\d+\b$/, (match, apiPrefix) => (apiPrefix ? "\/api" : ""));
+  return trimmed.replace(/\/(api\/)?v\d+\b$/, (match, apiPrefix) => (apiPrefix ? "/api" : ""));
 }
 
 function buildAuthHeaders(apiKey) {
