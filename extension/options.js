@@ -57,8 +57,8 @@ function validateInputs() {
   } else {
     try {
       const parsed = new URL(baseUrl);
-      if (!/^https?:$/.test(parsed.protocol)) {
-        throw new Error("Base URL must use HTTP or HTTPS.");
+      if (parsed.protocol !== "http:") {
+        throw new Error("Base URL must use http:// for LM Studio's local server.");
       }
     } catch (err) {
       fieldErrors.baseUrl = err?.message || "Invalid Base URL.";
