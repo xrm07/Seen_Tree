@@ -39,7 +39,7 @@ Target Lang: ja など
 host_permissions:
 http://127.0.0.1/*
 http://localhost/*
-permissions: storage, activeTab, scripting
+permissions: storage, activeTab, scripting, contextMenus
 設定保存は chrome.storage.sync（モデル名・Base URL・Target）。同期上限は約100KB
 5. LM Studio API（OpenAI互換）
 
@@ -70,7 +70,8 @@ manifest.json（抜粋）
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
   "host_permissions": [
     "http://127.0.0.1/*",
