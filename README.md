@@ -3,7 +3,7 @@
 LM Studio互換APIのみを叩く最小Chrome拡張。
 要件:
 
-LM StudioのAPI設定で作動
+LM StudioのAPI設定で作動（Chrome拡張からアクセスする場合は CORS を有効化しておく）
 選択テキスト時に選択近傍へ拡張アイコンを出し、クリックで翻訳→結果を近傍ポップ表示
 右上の拡張ポップから「全文翻訳」開始。終了後ページ上テキストを置換
 1. 構成
@@ -15,7 +15,7 @@ content.js → chrome.runtime.sendMessage → sw.js → fetch( LM Studio /v1/cha
 全文はcontent.jsがDOMテキストノードを列挙→逐次翻訳→置換
 2. インストール
 
-LM StudioでローカルAPIサーバを起動（Developer/Local Server）
+LM StudioでローカルAPIサーバを起動（Developer/Local Server）し、CORS を ON にする（CLI: `lms server start --cors --port 1234` など）
 このリポジトリを取得
 Chrome → chrome://extensions → デベロッパーモード → パッケージ化されていない拡張機能を読み込む → /extensionを選択
 拡張の「詳細」→「拡張機能のオプション」から以下を設定
@@ -37,8 +37,8 @@ Target Lang: ja など
 4. 設定・権限
 
 host_permissions:
-http://127.0.0.1:1234/*
-http://localhost:1234/*
+http://127.0.0.1/*
+http://localhost/*
 permissions: storage, activeTab, scripting
 設定保存は chrome.storage.sync（モデル名・Base URL・Target）。同期上限は約100KB
 5. LM Studio API（OpenAI互換）
@@ -66,15 +66,15 @@ manifest.json（抜粋）
 {
   "manifest_version": 3,
   "name": "LM Studio Translator (minimal)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "permissions": [
     "storage",
     "activeTab",
     "scripting"
   ],
   "host_permissions": [
-    "http://127.0.0.1:1234/",
-    "http://localhost:1234/"
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   "background": {
     "service_worker": "sw.js",
