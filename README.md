@@ -9,7 +9,7 @@ LM Studio のローカル API（OpenAI 互換）を呼び出して、選択テ�
 - 設定同期: 翻訳方向（英→日 / 日→英）、自動翻訳、原文ホバー表示、選択ボタン表示などを `chrome.storage.sync` に保存。
 
 ## 前提条件
-- LM Studio の Local Server（OpenAI Compatibility API）を `http://127.0.0.1:1234/v1` などで起動し、**CORS を有効化**していること。
+- LM Studio の Local Server（OpenAI Compatibility API）を `http://localhost:1234/v1`（または `http://127.0.0.1:1234/v1`）で起動し、**CORS を有効化**していること。
   - CLI 例: `lms server start --cors --port 1234`
   - ドキュメント: [LM Studio Docs – OpenAI Compatibility API](https://lmstudio.ai/docs/local-server/openai-compatibility-api)
 - Google Chrome（Manifest V3 対応版）。
@@ -17,11 +17,11 @@ LM Studio のローカル API（OpenAI 互換）を呼び出して、選択テ�
 ## 構成とデータフロー
 1. `content.js` が選択テキストやページ DOM テキストノードを取得。
 2. `chrome.runtime.sendMessage` で Service Worker (`sw.js`) に翻訳要求 (`TRANSLATE`) やモデル一覧要求 (`LIST_MODELS`) を送信。
-3. `sw.js` が `fetch` で LM Studio の `/v1/chat/completions` または `/v1/models` にアクセスし、結果を返却。
+3. `sw.js` が `fetch` で LM Studio の `/v1/chat/completions` または `/v1/models`（フォールバックで `/models`）にアクセスし、結果を返却。
 4. `content.js` が結果をポップ表示、またはページノードのテキストを置換。
 
 ## インストール手順
-1. LM Studio を起動し、左下の **Developer > Local Server** から API サーバーを開始（必要に応じてポートを確認）。
+1. LM Studio を起動し、左下の **Developer > Local Server** から API サーバーを開始（デフォルトはポート `1234`。必要に応じて変更を確認）。
 2. このリポジトリを取得して `extension/` ディレクトリを保持。
 3. Chrome で `chrome://extensions` を開き、右上の「デベロッパーモード」をオン。
 4. 「パッケージ化されていない拡張機能を読み込む」→ リポジトリ内の `extension/` を選択。
@@ -68,7 +68,7 @@ Content-Type: application/json
 }
 ```
 
-- モデル一覧取得は `GET http://127.0.0.1:1234/v1/models` を使用（フォールバックで `/api/v0/models` を試行）。
+- モデル一覧取得は `GET http://127.0.0.1:1234/v1/models` を利用（必要に応じて `/models` や `/api/v0/models` をフォールバックで試行）。
 - 応答は OpenAI 形式で、`choices[0].message.content` を翻訳結果として利用します。
 
 ## 主要ファイル
